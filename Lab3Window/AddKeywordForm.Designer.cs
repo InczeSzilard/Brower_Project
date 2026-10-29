@@ -47,7 +47,7 @@
             // 
             this.txtKeyword.Location = new System.Drawing.Point(161, 25);
             this.txtKeyword.Name = "txtKeyword";
-            this.txtKeyword.Size = new System.Drawing.Size(413, 22);
+            this.txtKeyword.Size = new System.Drawing.Size(340, 22);
             this.txtKeyword.TabIndex = 1;
             // 
             // btnCancel

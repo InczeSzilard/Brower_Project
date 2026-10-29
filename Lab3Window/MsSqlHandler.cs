@@ -1,28 +1,31 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SQLite;
-using System.IO;
+using System.Data.SqlClient;
 
 
 namespace Lab3Window
 {
-    // Handles everything related to the SQLite database:
+    // Handles everything related to the MSSQL database:
     // connecting, disconnecting, inserting keywords and reading them.
     // Form1 only calls these methods and doesn't write any SQL itself.
-    public class SQLiteHandler
+    public class MsSqlHandler
     {
-        // Name of the database file (created next to the .exe)
-        private readonly string dbFile;
+        // SQL Server instance (LocalDB comes with Visual Studio)
+        private readonly string server;
+
+        // Name of the database on the server
+        private readonly string dbName;
 
         // The open connection. It is null while we are not connected.
-        private SQLiteConnection conn;
+        private SqlConnection conn;
 
-        // Constructor: lets us choose the database file name (default "browser.db")
-        public SQLiteHandler(string dbFile = "browser.db")
+        // Constructor: lets us choose the server and the database name
+        public MsSqlHandler(string server = @"(localdb)\MSSQLLocalDB", string dbName = "BrowserDb")
         {
-            this.dbFile = dbFile;
+            this.server = server;
+            this.dbName = dbName;
         }
 
         // True when the connection exists and is open
@@ -32,7 +35,7 @@ namespace Lab3Window
         }
 
         // Connects to the database.
-        // If the file doesn't exist it is created, and the Keywords table is created
+        // If the database doesn't exist it is created, and the Keywords table is created
         // if it doesn't exist yet.
         public bool IsNewDatabase { get; private set; }
         public void ConnectToDb()
@@ -40,22 +43,39 @@ namespace Lab3Window
             // Already connected: nothing to do
             if (IsConnected) return;
 
-            // Creates an empty database file the first time
-            IsNewDatabase = !File.Exists(dbFile);
-            if (IsNewDatabase)
+            // Creates the database the first time (we connect to "master" for this)
+            using (var master = new SqlConnection(
+                "Server=" + server + ";Database=master;Integrated Security=True"))
             {
-                SQLiteConnection.CreateFile(dbFile);
+                master.Open();
+
+                using (var cmd = new SqlCommand("SELECT DB_ID(@name)", master))
+                {
+                    cmd.Parameters.AddWithValue("@name", dbName);
+                    IsNewDatabase = cmd.ExecuteScalar() == DBNull.Value;
+                }
+
+                if (IsNewDatabase)
+                {
+                    // CREATE DATABASE can't take a parameter, so the name goes in brackets
+                    using (var cmd = new SqlCommand("CREATE DATABASE [" + dbName + "]", master))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                }
             }
 
-            conn = new SQLiteConnection("Data Source=" + dbFile);
+            conn = new SqlConnection(
+                "Server=" + server + ";Database=" + dbName + ";Integrated Security=True");
             conn.Open();
 
-            // Creates the table only if it doesn't exist (IF NOT EXISTS)
-            string sql = @"CREATE TABLE IF NOT EXISTS Keywords (
-                               id INTEGER PRIMARY KEY AUTOINCREMENT,
-                               keyword TEXT)";
+            // Creates the table only if it doesn't exist (MSSQL has no IF NOT EXISTS here)
+            string sql = @"IF OBJECT_ID('Keywords', 'U') IS NULL
+                               CREATE TABLE Keywords (
+                                   id INT IDENTITY(1,1) PRIMARY KEY,
+                                   keyword NVARCHAR(200))";
 
-            using (var cmd = new SQLiteCommand(sql, conn))
+            using (var cmd = new SqlCommand(sql, conn))
             {
                 cmd.ExecuteNonQuery();
             }
@@ -78,7 +98,7 @@ namespace Lab3Window
             if (!IsConnected)
                 throw new InvalidOperationException("Not connected to the database.");
 
-            using (var cmd = new SQLiteCommand(
+            using (var cmd = new SqlCommand(
                 "INSERT INTO Keywords (keyword) VALUES (@k)", conn))
             {
                 // Parameter instead of putting the text directly in the SQL (safer)
@@ -91,7 +111,7 @@ namespace Lab3Window
             if (!IsConnected)
                 throw new InvalidOperationException("Not connected to the database.");
 
-            using (var cmd = new SQLiteCommand(
+            using (var cmd = new SqlCommand(
                "DELETE FROM Keywords WHERE keyword = @k", conn))
             {
                 // Parameter instead of putting the text directly in the SQL (safer)
@@ -108,7 +128,7 @@ namespace Lab3Window
 
             var keywords = new List<string>();
 
-            using (var cmd = new SQLiteCommand("SELECT keyword FROM Keywords ORDER BY id", conn))
+            using (var cmd = new SqlCommand("SELECT keyword FROM Keywords ORDER BY id", conn))
             using (var reader = cmd.ExecuteReader())
             {
                 // Read() moves to the next row; it returns false when there are no more rows

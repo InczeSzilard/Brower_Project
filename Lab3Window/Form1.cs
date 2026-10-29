@@ -12,7 +12,7 @@ namespace Lab3Window
         // Files are created next to the .exe
         private static readonly string baseDir = AppDomain.CurrentDomain.BaseDirectory;
 
-        private SQLiteHandler db = new SQLiteHandler(Path.Combine(baseDir, "browser.sqlite"));
+        private MsSqlHandler db = new MsSqlHandler();
         private KeywordFilter filter = new KeywordFilter();
         private AppLogger logger = new AppLogger(Path.Combine(baseDir, "browser_log.txt"));
 
@@ -232,7 +232,9 @@ namespace Lab3Window
                 }
 
                 if (AddKeyword(kwd))
+                {
                     MessageBox.Show("Keyword added: " + kwd);
+                }
             }
         }
 
@@ -285,7 +287,7 @@ namespace Lab3Window
         {
             MessageBox.Show(
                 "My Browser\n" +
-                "Mini-project 1 - Web Browser with blocked keywords (SQLite)\n" +
+                "Mini-project 1 - Web Browser with blocked keywords (MSSQL)\n" +
                 "Author: Szilard",
                 "About",
                 MessageBoxButtons.OK,
